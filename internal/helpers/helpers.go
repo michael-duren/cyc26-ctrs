@@ -1,7 +1,10 @@
 // a simple package of helpers for the presentation
 package helpers
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 func Usage() {
 	fmt.Println(`
@@ -14,4 +17,23 @@ Commands:
 Example:
 	  demo run /bin/bash         Runs '/bin/bash' in a containerized process
 		`)
+}
+
+type CmdInput struct {
+	RuntimeCmd   string
+	ContainerCmd string
+	CmdArgs      []string
+}
+
+func ParseInput() *CmdInput {
+	if len(os.Args) < 3 {
+		Usage()
+		return nil
+	}
+
+	return &CmdInput{
+		RuntimeCmd:   os.Args[1],
+		ContainerCmd: os.Args[2],
+		CmdArgs:      os.Args[3:],
+	}
 }

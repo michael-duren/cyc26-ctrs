@@ -24,9 +24,9 @@ node server.js
 | Env           | Default                                                           | Meaning                          |
 |---------------|------------------------------------------------------------------|----------------------------------|
 | `PORT`        | `3000`                                                            | HTTP port                        |
-| `EVILNODE_LOG`| first of `/var/log/evilnode.log`, `/tmp/evilnode.log`, self-test | which probe log to read          |
+| `NODE_LOG`    | first of `/var/log/node.log`, `/tmp/node.log`, self-test         | which probe log to read          |
 
-Point `EVILNODE_LOG` at the container's log (e.g. a bind-mounted path) if you run
+Point `NODE_LOG` at the container's log (e.g. a bind-mounted path) if you run
 the app on the host but the probe inside the container.
 
 ## Presentation flow

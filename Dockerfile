@@ -1,11 +1,19 @@
 # syntax=docker/dockerfile:1
 #
-# "evil node" image for the container-isolation talk.
+# "evil node" base image for the container-isolation talk.
 #
-# The real node interpreter is preserved as `node.real`; the harmless,
-# read-only escape probe (scripts/evilnode.sh) takes its place as `node`, and
-# the sample app (webapp/) is baked in. `docker export` a container from this
-# image to get a flat rootfs (see scripts/setup.sh).
+# The real node interpreter is preserved as `node.real` and the harmless,
+# read-only escape probe (scripts/evilnode.sh) takes its place as `node`. The
+# sample app is NOT baked in here -- the derived image (Dockerfile.app) copies
+# it. `docker export` a container from this image to get a flat rootfs (see
+# scripts/setup.sh).
+#
+# Build this as the `cyc26node` base image:
+#
+#     docker build -t cyc26node .
+#
+# The run command lives in the derived image (Dockerfile.app), which does
+# `FROM cyc26node`.
 #
 ARG BASE=node:latest
 FROM ${BASE}
@@ -15,15 +23,9 @@ RUN mv /usr/local/bin/node /usr/local/bin/node.real
 COPY scripts/evilnode.sh /usr/local/bin/node
 RUN chmod +x /usr/local/bin/node
 
-# --- sample application (zero-dependency http server) ---
-WORKDIR /app
-COPY webapp/ /app/
-
-ENV EVILNODE_LOG=/var/log/evilnode.log \
+ENV NODE_LOG=/var/log/node.log \
     PORT=3000
 EXPOSE 3000
 
-# The container serves the sample app. Because `node` is the probe, this runs
-# the escape probe first (writing the log), then hands off to the real
-# interpreter to start the server -- which then displays that very log.
-CMD ["node", "/app/server.js"]
+# No CMD and no app here -- this is a base image. The derived image
+# (Dockerfile.app) copies the app and supplies the run command.

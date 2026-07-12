@@ -21,9 +21,9 @@ set -u
 # ----------------------------------------------------------------------------
 # setup: log destination + colour
 # ----------------------------------------------------------------------------
-LOG="${EVILNODE_LOG:-/var/log/evilnode.log}"
+LOG="${NODE_LOG:-/var/log/node.log}"
 if ! { : >>"$LOG"; } 2>/dev/null; then
-    LOG="/tmp/evilnode.log"
+    LOG="/tmp/node.log"
     : >>"$LOG" 2>/dev/null || LOG="/dev/null"
 fi
 

@@ -18,10 +18,10 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
-// If EVILNODE_LOG is set we read EXACTLY that file (no fallback) so a stale
+// If NODE_LOG is set we read EXACTLY that file (no fallback) so a stale
 // log can never sneak in during the demo. Otherwise we try the probe's own
 // default targets, most-privileged first.
-const DEFAULT_LOGS = ['/var/log/evilnode.log', '/tmp/evilnode.log'];
+const DEFAULT_LOGS = ['/var/log/node.log', '/tmp/node.log'];
 
 const LOGO = fs.readFileSync(path.join(__dirname, 'public', 'large_cyc_logo.svg'));
 
@@ -30,7 +30,7 @@ const LOGO = fs.readFileSync(path.join(__dirname, 'public', 'large_cyc_logo.svg'
 // ---------------------------------------------------------------------------
 
 function pickLog() {
-  const candidates = process.env.EVILNODE_LOG ? [process.env.EVILNODE_LOG] : DEFAULT_LOGS;
+  const candidates = process.env.NODE_LOG ? [process.env.NODE_LOG] : DEFAULT_LOGS;
   for (const p of candidates) {
     try {
       fs.accessSync(p, fs.constants.R_OK);
@@ -267,7 +267,7 @@ function render(v){
       + '<h2>No scan yet</h2><p class="sub2">Run the escape probe inside the container first.</p>'
       + '</div></div><div class="nodata-body">'
       + 'Start the evil container and run <code>node</code> (that&rsquo;s the probe). '
-      + 'It writes <code>'+escapeHtml(v.logPath || '/var/log/evilnode.log')+'</code>, then reload this page.'
+      + 'It writes <code>'+escapeHtml(v.logPath || '/var/log/node.log')+'</code>, then reload this page.'
       + '</div></div>';
   }
   // Update only the meta text; the persistent .beat node is left alone so its
@@ -317,7 +317,7 @@ function resultsHTML(v) {
   return `<div class="card"><div class="card-head head-nodata"><span class="dot"></span><div>
       <h2>No scan yet</h2><p class="sub2">Run the escape probe inside the container first.</p>
     </div></div><div class="nodata-body">Start the evil container and run <code>node</code> (the probe).
-    It writes <code>${esc(v.logPath || '/var/log/evilnode.log')}</code>, then reload.</div></div>`;
+    It writes <code>${esc(v.logPath || '/var/log/node.log')}</code>, then reload.</div></div>`;
 }
 
 // ---------------------------------------------------------------------------
