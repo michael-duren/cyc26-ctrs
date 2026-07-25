@@ -26,6 +26,8 @@ func main() {
 
 func run(cmdName string, args []string) {
 	fmt.Println("running cmd:", cmdName, "with args:", args)
+
+	// TODO: run users command and arguments
 }
 
 func reexec(cmdName string, args []string) {
