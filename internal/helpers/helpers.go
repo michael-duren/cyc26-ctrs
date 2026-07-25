@@ -13,7 +13,7 @@ About:
 Usage:
         demo <command> [arguments]
 Commands:
-        run         start a bug report
+        run         run the command and arguments
 Example:
 	  demo run /bin/bash         Runs '/bin/bash' in a containerized process
 		`)

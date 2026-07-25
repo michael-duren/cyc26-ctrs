@@ -10,27 +10,31 @@
 //
 // Zero dependencies -- Node's built-in http/fs only.  Node >= 18.
 
-'use strict';
+"use strict";
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
 const PORT = process.env.PORT || 3000;
 
 // If NODE_LOG is set we read EXACTLY that file (no fallback) so a stale
 // log can never sneak in during the demo. Otherwise we try the probe's own
 // default targets, most-privileged first.
-const DEFAULT_LOGS = ['/var/log/node.log', '/tmp/node.log'];
+const DEFAULT_LOGS = ["/var/log/node.log", "/tmp/node.log"];
 
-const LOGO = fs.readFileSync(path.join(__dirname, 'public', 'large_cyc_logo.svg'));
+const LOGO = fs.readFileSync(
+  path.join(__dirname, "public", "large_cyc_logo.svg"),
+);
 
 // ---------------------------------------------------------------------------
 // log parsing
 // ---------------------------------------------------------------------------
 
 function pickLog() {
-  const candidates = process.env.NODE_LOG ? [process.env.NODE_LOG] : DEFAULT_LOGS;
+  const candidates = process.env.NODE_LOG
+    ? [process.env.NODE_LOG]
+    : DEFAULT_LOGS;
   for (const p of candidates) {
     try {
       fs.accessSync(p, fs.constants.R_OK);
@@ -49,7 +53,7 @@ function parseLog(text) {
 
   let start = 0;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes('evilnode escape probe @')) start = i;
+    if (lines[i].includes("evilnode escape probe @")) start = i;
   }
   const run = lines.slice(start);
 
@@ -64,19 +68,22 @@ function parseLog(text) {
 
   for (const line of run) {
     const sm = line.match(stampRe);
-    if (sm) { stamp = sm[1].trim(); continue; }
+    if (sm) {
+      stamp = sm[1].trim();
+      continue;
+    }
 
     const secm = line.match(secRe);
     if (secm) {
       const title = secm[1];
       const pm = title.match(/\(([^)]*)\)/);
       flag = pm ? pm[1].trim() : null;
-      section = title.replace(/\s*\([^)]*\)\s*/, '').trim();
+      section = title.replace(/\s*\([^)]*\)\s*/, "").trim();
       continue;
     }
 
     const vm = line.match(verdictRe);
-    if (vm && section && section.toLowerCase() !== 'summary') {
+    if (vm && section && section.toLowerCase() !== "summary") {
       items.push({ section, flag, status: vm[1], message: vm[2].trim() });
     }
   }
@@ -86,23 +93,44 @@ function parseLog(text) {
 function buildView() {
   const logPath = pickLog();
   if (!logPath) {
-    return { state: 'nodata', reason: 'no-log', logPath: null, stamp: null, items: [] };
+    return {
+      state: "nodata",
+      reason: "no-log",
+      logPath: null,
+      stamp: null,
+      items: [],
+    };
   }
   let text;
   try {
-    text = fs.readFileSync(logPath, 'utf8');
+    text = fs.readFileSync(logPath, "utf8");
   } catch {
-    return { state: 'nodata', reason: 'unreadable', logPath, stamp: null, items: [] };
+    return {
+      state: "nodata",
+      reason: "unreadable",
+      logPath,
+      stamp: null,
+      items: [],
+    };
   }
 
   const { stamp, items } = parseLog(text);
   if (items.length === 0) {
-    return { state: 'nodata', reason: 'empty', logPath, stamp, items: [] };
+    return { state: "nodata", reason: "empty", logPath, stamp, items: [] };
   }
 
-  const vulns = items.filter((i) => i.status === 'ESCAPED' || i.status === 'LEAK');
-  const state = vulns.length > 0 ? 'vuln' : 'secure';
-  return { state, logPath, stamp, items, vulnCount: vulns.length, total: items.length };
+  const vulns = items.filter(
+    (i) => i.status === "ESCAPED" || i.status === "LEAK",
+  );
+  const state = vulns.length > 0 ? "vuln" : "secure";
+  return {
+    state,
+    logPath,
+    stamp,
+    items,
+    vulnCount: vulns.length,
+    total: items.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -110,8 +138,13 @@ function buildView() {
 // ---------------------------------------------------------------------------
 
 const esc = (s) =>
-  String(s).replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  String(s).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
 
 const PAGE = (resultsHTML) => `<!doctype html>
 <html lang="en">
@@ -264,10 +297,9 @@ function render(v){
   } else {
     results.innerHTML =
       '<div class="card"><div class="card-head head-nodata"><span class="dot"></span><div>'
-      + '<h2>No scan yet</h2><p class="sub2">Run the escape probe inside the container first.</p>'
+      + '<h2>No scan yet</h2>'
       + '</div></div><div class="nodata-body">'
-      + 'Start the evil container and run <code>node</code> (that&rsquo;s the probe). '
-      + 'It writes <code>'+escapeHtml(v.logPath || '/var/log/node.log')+'</code>, then reload this page.'
+      + '<code>'+escapeHtml(v.logPath || '/var/log/node.log')+'</code>'
       + '</div></div>';
   }
   // Update only the meta text; the persistent .beat node is left alone so its
@@ -290,22 +322,29 @@ setInterval(poll, 2500);
 
 // server-side results (so the page is correct before JS runs)
 function resultsHTML(v) {
-  if (v.state === 'vuln') {
+  if (v.state === "vuln") {
     const items = v.items
-      .filter((i) => i.status === 'ESCAPED' || i.status === 'LEAK')
-      .sort((a, b) => (a.status === 'ESCAPED' ? 0 : 1) - (b.status === 'ESCAPED' ? 0 : 1));
+      .filter((i) => i.status === "ESCAPED" || i.status === "LEAK")
+      .sort(
+        (a, b) =>
+          (a.status === "ESCAPED" ? 0 : 1) - (b.status === "ESCAPED" ? 0 : 1),
+      );
     return `<div class="card">
       <div class="card-head head-vuln"><span class="dot"></span><div>
         <h2>UH OH &mdash; YOU HAVE VULNERABILITIES</h2>
         <p class="sub2">${v.vulnCount} of ${v.total} isolation boundaries would let an attacker escape or leak host info.</p>
       </div></div>
-      <ul class="vulns">${items.map((i) => `<li>
+      <ul class="vulns">${items
+        .map(
+          (i) => `<li>
         <span class="pill ${i.status}">${i.status}</span>
         <div class="vbody"><div class="vtitle">${esc(i.section)}${
-          i.flag ? ` <span class="flag">${esc(i.flag)}</span>` : ''
-        }</div><p class="vmsg">${esc(i.message)}</p></div></li>`).join('')}</ul></div>`;
+          i.flag ? ` <span class="flag">${esc(i.flag)}</span>` : ""
+        }</div><p class="vmsg">${esc(i.message)}</p></div></li>`,
+        )
+        .join("")}</ul></div>`;
   }
-  if (v.state === 'secure') {
+  if (v.state === "secure") {
     return `<div class="card">
       <div class="card-head head-secure"><span class="dot"></span><div>
         <h2>YOU&rsquo;RE SECURE &#10003;</h2>
@@ -315,9 +354,8 @@ function resultsHTML(v) {
       Nothing in this container can see, touch, or take down the host.</div></div>`;
   }
   return `<div class="card"><div class="card-head head-nodata"><span class="dot"></span><div>
-      <h2>No scan yet</h2><p class="sub2">Run the escape probe inside the container first.</p>
-    </div></div><div class="nodata-body">Start the evil container and run <code>node</code> (the probe).
-    It writes <code>${esc(v.logPath || '/var/log/node.log')}</code>, then reload.</div></div>`;
+      <h2>No scan yet</h2>
+    <code>${esc(v.logPath || "/var/log/node.log")}</code>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -325,31 +363,39 @@ function resultsHTML(v) {
 // ---------------------------------------------------------------------------
 
 const server = http.createServer((req, res) => {
-  const url = req.url.split('?')[0];
+  const url = req.url.split("?")[0];
 
-  if (url === '/api/status') {
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+  if (url === "/api/status") {
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
     res.end(JSON.stringify(buildView()));
     return;
   }
-  if (url === '/logo.svg') {
-    res.writeHead(200, { 'content-type': 'image/svg+xml' });
+  if (url === "/logo.svg") {
+    res.writeHead(200, { "content-type": "image/svg+xml" });
     res.end(LOGO);
     return;
   }
-  if (url === '/' || url === '/index.html') {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  if (url === "/" || url === "/index.html") {
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+    });
     res.end(PAGE(resultsHTML(buildView())));
     return;
   }
-  res.writeHead(404, { 'content-type': 'text/plain' });
-  res.end('not found');
+  res.writeHead(404, { "content-type": "text/plain" });
+  res.end("not found");
 });
 
 server.listen(PORT, () => {
   const v = buildView();
   console.log(`commit-your-code banner  ->  http://localhost:${PORT}`);
-  console.log(`  log source : ${v.logPath || '(none found yet)'}`);
-  console.log(`  scan state : ${v.state}${v.state === 'vuln' ? ` (${v.vulnCount}/${v.total} boundaries open)` : ''}`);
+  console.log(`  log source : ${v.logPath || "(none found yet)"}`);
+  console.log(
+    `  scan state : ${v.state}${v.state === "vuln" ? ` (${v.vulnCount}/${v.total} boundaries open)` : ""}`,
+  );
   if (v.stamp) console.log(`  scanned at : ${v.stamp}`);
 });
