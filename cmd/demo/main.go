@@ -31,7 +31,6 @@ func main() {
 func run(cmdName string, args []string) {
 	fmt.Println("running cmd:", cmdName, "with args:", args)
 
-	// TODO: run users command and arguments
 	cmd := exec.Command(cmdName, args...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -39,6 +38,7 @@ func run(cmdName string, args []string) {
 		// syscall to configure our new process namespaces
 		// newuts specifically allows us to reset the hostname, fun fact
 		// has nothing to do with keeping track of time
+		// TODO: Add new process ns
 		Cloneflags: syscall.CLONE_NEWUTS,
 	}
 
@@ -46,6 +46,7 @@ func run(cmdName string, args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	// TODO: Start wiring this into reexec, and mount proc
 	must("change hostname", syscall.Sethostname([]byte("container")))
 	must("change root", syscall.Chroot(rootfs))
 	must("change dir to root level", syscall.Chdir("/"))
