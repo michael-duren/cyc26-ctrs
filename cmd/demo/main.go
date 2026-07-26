@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"syscall"
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 )
@@ -10,6 +13,7 @@ import (
 const (
 	containerPort = "3000"
 	hostPort      = "3000"
+	rootfs        = "rootfs"
 )
 
 func main() {
@@ -28,6 +32,25 @@ func run(cmdName string, args []string) {
 	fmt.Println("running cmd:", cmdName, "with args:", args)
 
 	// TODO: run users command and arguments
+	cmd := exec.Command(cmdName, args...)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		// clone flags are the arguments we can pass to the `clone`
+		// syscall to configure our new process namespaces
+		// newuts specifically allows us to reset the hostname, fun fact
+		// has nothing to do with keeping track of time
+		Cloneflags: syscall.CLONE_NEWUTS,
+	}
+
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	must("change hostname", syscall.Sethostname([]byte("container")))
+	must("change root", syscall.Chroot(rootfs))
+	must("change dir to root level", syscall.Chdir("/"))
+
+	must("run users command and args", cmd.Run())
 }
 
 func reexec(cmdName string, args []string) {
@@ -35,9 +58,9 @@ func reexec(cmdName string, args []string) {
 	fmt.Println("I'm in reexec", containerPort, hostPort)
 }
 
-// func must(what string, err error) {
-// 	if err != nil {
-// 		fmt.Println(what+" error: ", err)
-// 		os.Exit(1)
-// 	}
-// }
+func must(what string, err error) {
+	if err != nil {
+		fmt.Println(what+" error: ", err)
+		os.Exit(1)
+	}
+}

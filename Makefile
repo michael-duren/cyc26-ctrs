@@ -6,7 +6,10 @@ PREFIX ?= $(HOME)/.local
 .PHONY: run, build, setup-node
 
 run:
-	@go run $(PKG) run "/bin/bash" "node"
+	@go run $(PKG) run "/bin/bash"
+
+sudo:
+	sudo go run $(PKG) run "/bin/bash"
 
 reexec:
 	@echo "warning: this is for testing"
