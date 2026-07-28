@@ -35,8 +35,6 @@ func run(cmdName string, args []string) {
 	// execute ourself
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
-	// TODO: get current user info
-
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// clone flags are the arguments we can pass to the `clone`
 		// syscall to configure our new process namespaces
@@ -48,8 +46,21 @@ func run(cmdName string, args []string) {
 			// mount ns gives us separate mount tables ESSENTIAL for being able
 			// to safely mount a new /proc fs, which is needed for process isolation
 			// and view in the container
-			syscall.CLONE_NEWNS, // TODO: userns
-		// TODO: configure user mappings for sysprocattr
+			syscall.CLONE_NEWNS |
+			syscall.CLONE_NEWUSER,
+		UidMappings: []syscall.SysProcIDMap{{
+			// the userid in the container
+			ContainerID: 0,
+			// mapped to our current uid on host
+			HostID: os.Getuid(),
+			// just map one uid
+			Size: 1,
+		}},
+		GidMappings: []syscall.SysProcIDMap{{
+			ContainerID: 0,
+			HostID:      os.Getgid(),
+			Size:        1,
+		}},
 	}
 
 	cmd.Stdin = os.Stdin
