@@ -25,15 +25,15 @@ type CmdInput struct {
 	CmdArgs      []string
 }
 
-func ParseInput() *CmdInput {
+func ParseInput() (*CmdInput, error) {
 	if len(os.Args) < 3 {
 		Usage()
-		return nil
+		return nil, fmt.Errorf("unable to read args: %v", os.Args)
 	}
 
 	return &CmdInput{
 		RuntimeCmd:   os.Args[1],
 		ContainerCmd: os.Args[2],
 		CmdArgs:      os.Args[3:],
-	}
+	}, nil
 }
