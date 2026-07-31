@@ -23,8 +23,10 @@ RUN mv /usr/local/bin/node /usr/local/bin/node.real
 COPY scripts/evilnode.sh /usr/local/bin/node
 RUN chmod +x /usr/local/bin/node
 
+RUN apt update && apt install iproute2 -y
+
 ENV NODE_LOG=/var/log/node.log \
-    PORT=3000
+  PORT=3000
 EXPOSE 3000
 
 # No CMD and no app here -- this is a base image. The derived image
