@@ -1,0 +1,15 @@
+version: "2"
+
+linters:
+  default: standard
+  settings:
+    errcheck:
+      # flag ignored errors in type assertions: v := x.(T)
+      check-type-assertions: true
+      # flag errors explicitly discarded with _ = f()
+      check-blank: true
+  exclusions:
+    paths:
+      # extracted container filesystem, not our code
+      - rootfs
+

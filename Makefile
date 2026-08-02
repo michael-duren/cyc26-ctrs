@@ -3,7 +3,7 @@ PKG := ./cmd/demo
 BIN_DIR := bin
 PREFIX ?= $(HOME)/.local
 
-.PHONY: run, build, setup-node
+.PHONY: run, build, setup-node, lint
 
 run:
 	@go run $(PKG) run "/bin/bash"
@@ -18,6 +18,9 @@ reexec:
 
 build:
 	@go build -o $(BINARY) $(PKG)
+
+lint:
+	@golangci-lint run ./...
 
 setup-node:
 	@bash scripts/setup.sh
