@@ -1,12 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
+	"github.com/vishvananda/netlink"
 )
 
 // the two halves of docker's -p 3000:3000
@@ -14,6 +18,8 @@ const (
 	containerPort = "3000"
 	hostPort      = "3000"
 	rootfs        = "rootfs"
+	veth1         = "veth1"
+	veth2         = "veth2"
 )
 
 func main() {
@@ -47,6 +53,7 @@ func run(cmdName string, args []string) {
 			// to safely mount a new /proc fs, which is needed for process isolation
 			// and view in the container
 			syscall.CLONE_NEWNS |
+			syscall.CLONE_NEWNET |
 			syscall.CLONE_NEWUSER,
 		UidMappings: []syscall.SysProcIDMap{{
 			// the userid in the container
@@ -67,11 +74,36 @@ func run(cmdName string, args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	must("run users command and args", cmd.Run())
+	r, w, err := os.Pipe()
+	must("open pipe", err)
+	// cmd.ExtraFiles =
+	cmd.ExtraFiles = []*os.File{r}
+	must("start container process", cmd.Start())
+
+	pid := cmd.Process.Pid
+	createParentVeth(pid)
+
+	// close writer sends eof to cprocess
+	must("close writer to send cp eof signal", w.Close())
+
+	fmt.Println("child pid: ", pid)
+	if err := cmd.Wait(); err != nil {
+		fmt.Println("error occured while waiting for process to finish", err)
+	}
 }
 
 func reexec(cmdName string, args []string) {
 	fmt.Println("reexecing cmd:", cmdName, "with args:", args)
+	// wait for parent setup to finish
+	r := os.NewFile(3, "sync")
+	buf := make([]byte, 1)
+	_, err := r.Read(buf)
+	if !errors.Is(err, io.EOF) {
+		must("receive eof from parent", err)
+	}
+
+	createChildVeth()
+	fmt.Println("after createchildveth")
 	// we're not re mounting anything just setting all mounts to be private so that changes
 	// aren't shared with parent ns i.e. host
 	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))
@@ -89,9 +121,64 @@ func reexec(cmdName string, args []string) {
 	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), os.Environ()))
 }
 
-func must(what string, err error) {
-	if err != nil {
-		fmt.Println(what+" error: ", err)
-		os.Exit(1)
+func createParentVeth(cpid int) {
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: veth1,
+		},
+		PeerName:      veth2,
+		PeerNamespace: netlink.NsPid(cpid),
 	}
+	// create the link from parent to child
+	must("create veth", netlink.LinkAdd(veth))
+
+	// get the link
+	link, err := netlink.LinkByName(veth1)
+	must("resolve veth1 link", err)
+
+	// set addr
+	addr, err := netlink.ParseAddr("10.0.0.1/24")
+	must("parse addr ", err)
+	must("add addr ", netlink.AddrAdd(link, addr))
+	// enable device
+	must("set link to up", netlink.LinkSetUp(link))
+}
+
+// createChildVeth assumed [createParentVeth] has been called
+// finishes setting up the veth connection from the pov of
+// the child
+func createChildVeth() {
+	link, err := netlink.LinkByName(veth2)
+	must("resolve netlink from veth2", err)
+	addr, err := netlink.ParseAddr("10.0.0.2/24")
+	must("parse addr", err)
+	must("add addr veth2", netlink.AddrAdd(link, addr))
+	must("set veth2 ↑", netlink.LinkSetUp(link))
+
+	// NOTE: child p loopback is down by default node process would fail
+	link, err = netlink.LinkByName("lo")
+	must("resolve link from loopback", err)
+	must("set loopback up", netlink.LinkSetUp(link))
+}
+
+func must(what string, errs ...error) {
+	errSlice := make([]error, 0, len(errs))
+	for _, err := range errs {
+		if err != nil {
+			errSlice = append(errSlice, err)
+		}
+	}
+
+	if len(errSlice) == 0 {
+		return
+	}
+	var sb strings.Builder
+
+	for _, err := range errSlice {
+		fmt.Fprintf(&sb, "%s ", err.Error())
+	}
+
+	fmt.Printf("%s %s\n", what, sb.String())
+	fmt.Println("exiting")
+	os.Exit(1)
 }
