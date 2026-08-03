@@ -1,20 +1,27 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/michael-duren/boxes/presentation-project/internal/firewall"
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
+	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
 	"github.com/vishvananda/netlink"
 )
 
 // the two halves of docker's -p 3000:3000
 const (
+	hostaddr      = "10.0.0.1"
+	containeraddr = "10.0.0.2"
 	containerPort = "3000"
 	hostPort      = "3000"
 	rootfs        = "rootfs"
@@ -41,6 +48,18 @@ func run(cmdName string, args []string) {
 	// execute ourself
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
+	hostUID := os.Getuid()
+	if s := os.Getenv("SUDO_UID"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			hostUID = n
+		}
+	}
+	hostGID := os.Getgid()
+	if s := os.Getenv("SUDO_GID"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil {
+			hostGID = n
+		}
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// clone flags are the arguments we can pass to the `clone`
 		// syscall to configure our new process namespaces
@@ -59,15 +78,16 @@ func run(cmdName string, args []string) {
 			// the userid in the container
 			ContainerID: 0,
 			// mapped to our current uid on host
-			HostID: os.Getuid(),
+			HostID: hostUID,
 			// just map one uid
 			Size: 1,
 		}},
 		GidMappings: []syscall.SysProcIDMap{{
 			ContainerID: 0,
-			HostID:      os.Getgid(),
+			HostID:      hostGID,
 			Size:        1,
 		}},
+		Credential: &syscall.Credential{Uid: 0, Gid: 0},
 	}
 
 	cmd.Stdin = os.Stdin
@@ -81,15 +101,33 @@ func run(cmdName string, args []string) {
 	must("start container process", cmd.Start())
 
 	pid := cmd.Process.Pid
+	defer cleanupVEth()
 	createParentVeth(pid)
 
 	// close writer sends eof to cprocess
 	must("close writer to send cp eof signal", w.Close())
 
+	// like docker's DOCKER chain: only the published port gets through
+	must("apply firewall rules", firewall.Block(containeraddr, containerPort))
+	defer func() {
+		if err := firewall.Cleanup(); err != nil {
+			fmt.Println("firewall cleanup failed:", err)
+		}
+	}()
+
+	go func() {
+		// docker-style -p: wildcard bind covers localhost, 10.0.0.1, and LAN
+		err := proxy.Proxy(proxy.ToAddr("0.0.0.0", hostPort), proxy.ToAddr(containeraddr, containerPort))
+		if err != nil {
+			fmt.Println("err proxying", err)
+		}
+	}()
+
 	fmt.Println("child pid: ", pid)
 	if err := cmd.Wait(); err != nil {
 		fmt.Println("error occured while waiting for process to finish", err)
 	}
+	os.Exit(0)
 }
 
 func reexec(cmdName string, args []string) {
@@ -108,7 +146,11 @@ func reexec(cmdName string, args []string) {
 	// aren't shared with parent ns i.e. host
 	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))
 
-	must("change hostname", syscall.Sethostname([]byte("container")))
+	// docker-style hostname: random 12 hex chars (docker uses the container id prefix)
+	hn := make([]byte, 6)
+	_, err = rand.Read(hn)
+	must("generate hostname", err)
+	must("change hostname", syscall.Sethostname([]byte(hex.EncodeToString(hn))))
 	must("change root", syscall.Chroot(rootfs))
 	must("change dir to root level", syscall.Chdir("/"))
 
@@ -130,6 +172,7 @@ func createParentVeth(cpid int) {
 		PeerNamespace: netlink.NsPid(cpid),
 	}
 	// create the link from parent to child
+	cleanupVEth()
 	must("create veth", netlink.LinkAdd(veth))
 
 	// get the link
@@ -181,4 +224,18 @@ func must(what string, errs ...error) {
 	fmt.Printf("%s %s\n", what, sb.String())
 	fmt.Println("exiting")
 	os.Exit(1)
+}
+
+func cleanupVEth() {
+	link, err := netlink.LinkByName(veth1)
+	if err != nil {
+		if _, ok := errors.AsType[netlink.LinkNotFoundError](err); ok {
+			return
+		}
+		fmt.Println("cleanup: lookup veth1", err)
+		return
+	}
+	if err := netlink.LinkDel(link); err != nil {
+		fmt.Println("cleanup: deleting veth1", err)
+	}
 }

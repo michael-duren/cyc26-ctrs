@@ -6,6 +6,10 @@ import (
 	"net"
 )
 
+func ToAddr(hostname, port string) string {
+	return fmt.Sprintf("%s:%s", hostname, port)
+}
+
 func Proxy(addr1, addr2 string) error {
 	l, err := net.Listen("tcp", addr1)
 	if err != nil {
