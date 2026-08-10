@@ -96,6 +96,7 @@ func run(cmdName string, args []string) {
 
 	r, w, err := os.Pipe()
 	must("open pipe", err)
+
 	// cmd.ExtraFiles =
 	cmd.ExtraFiles = []*os.File{r}
 	must("start container process", cmd.Start())
@@ -123,7 +124,6 @@ func run(cmdName string, args []string) {
 		}
 	}()
 
-	fmt.Println("child pid: ", pid)
 	if err := cmd.Wait(); err != nil {
 		fmt.Println("error occured while waiting for process to finish", err)
 	}
@@ -142,6 +142,7 @@ func reexec(cmdName string, args []string) {
 
 	createChildVeth()
 	fmt.Println("after createchildveth")
+
 	// we're not re mounting anything just setting all mounts to be private so that changes
 	// aren't shared with parent ns i.e. host
 	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))

@@ -2,5 +2,5 @@
 
 ## About
 
-Presentatino for CYC26 buiding a container 
-runtime. 
+Presentation for CYC26 buiding a container
+runtime.

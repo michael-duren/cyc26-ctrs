@@ -23,7 +23,7 @@ RUN mv /usr/local/bin/node /usr/local/bin/node.real
 COPY scripts/evilnode.sh /usr/local/bin/node
 RUN chmod +x /usr/local/bin/node
 
-RUN apt update && apt install iproute2 -y
+RUN apt update && apt install iproute2 -y && apt install ufw -y
 
 ENV NODE_LOG=/var/log/node.log \
   PORT=3000
