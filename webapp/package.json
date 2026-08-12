@@ -1,11 +1,13 @@
 {
   "name": "commit-your-code-banner",
   "version": "1.0.0",
-  "description": "Big 'hello, commit your code!' banner that reads the evilnode escape-probe log and shows vulnerabilities vs. secure.",
+  "description": "Isolation-probe status banner for the container talk; themed as 'cyc' (Commit Your Code) or 'nagios'.",
   "type": "commonjs",
-  "main": "server.js",
+  "main": "server.cyc.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.cyc.js",
+    "start:cyc": "node server.cyc.js",
+    "start:nagios": "node server.nagios.js"
   },
   "engines": {
     "node": ">=18"
