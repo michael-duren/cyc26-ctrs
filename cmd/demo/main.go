@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,13 +21,14 @@ import (
 
 // the two halves of docker's -p 3000:3000
 const (
-	hostaddr      = "10.0.0.1"
 	containeraddr = "10.0.0.2"
 	containerPort = "3000"
 	hostPort      = "3000"
 	rootfs        = "rootfs"
 	veth1         = "veth1"
 	veth2         = "veth2"
+	cgrouppath    = "/sys/fs/cgroup/system.slice/boxes.service"
+	fileperms     = 0o755
 )
 
 func main() {
@@ -73,7 +75,9 @@ func run(cmdName string, args []string) {
 			// and view in the container
 			syscall.CLONE_NEWNS |
 			syscall.CLONE_NEWNET |
-			syscall.CLONE_NEWUSER,
+			syscall.CLONE_NEWUSER |
+			syscall.CLONE_NEWCGROUP,
+		Unshareflags: syscall.CLONE_NEWNS,
 		UidMappings: []syscall.SysProcIDMap{{
 			// the userid in the container
 			ContainerID: 0,
@@ -105,6 +109,9 @@ func run(cmdName string, args []string) {
 	defer cleanupVEth()
 	createParentVeth(pid)
 
+	cg(pid)
+	defer func() { must("cleanup cg", cleannupcg()) }()
+
 	// close writer sends eof to cprocess
 	must("close writer to send cp eof signal", w.Close())
 
@@ -126,6 +133,7 @@ func run(cmdName string, args []string) {
 
 	if err := cmd.Wait(); err != nil {
 		fmt.Println("error occured while waiting for process to finish", err)
+		os.Exit(1)
 	}
 	os.Exit(0)
 }
@@ -162,6 +170,35 @@ func reexec(cmdName string, args []string) {
 	must("resolve command path", err)
 
 	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), os.Environ()))
+}
+
+func cg(pid int) {
+	// create if not already there
+	must("create service cgroup", os.MkdirAll(cgrouppath, fileperms))
+	must("enable pids controller", os.WriteFile(
+		filepath.Join(cgrouppath, "cgroup.subtree_control"), []byte("+pids"), fileperms))
+
+	ctrpath := filepath.Join(cgrouppath, "ctr1")
+	must("create ctr cgroup", os.MkdirAll(ctrpath, fileperms))
+	must("write current pid to new cgroup",
+		os.WriteFile(
+			filepath.Join(ctrpath, "cgroup.procs"),
+			fmt.Appendf(nil, "%d", pid),
+			fileperms,
+		),
+	)
+	must("write pids.max", os.WriteFile(filepath.Join(ctrpath, "pids.max"), []byte("50"), fileperms))
+}
+
+func cleannupcg() error {
+	fmt.Println("running in cleanup")
+	ctrpath := filepath.Join(cgrouppath, "ctr1")
+	// cleanup ctr specifically
+	if err := os.Remove(ctrpath); err != nil {
+		return err
+	}
+	// cleanup svc
+	return os.Remove(cgrouppath)
 }
 
 func createParentVeth(cpid int) {

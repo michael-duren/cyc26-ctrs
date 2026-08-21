@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-#
 # App image for the container-isolation talk. Built on the `cyc26node` base
 # image (see Dockerfile), which already has the evilnode probe installed as
 # `node`. This image adds the sample app and the run command.
@@ -21,6 +19,7 @@ ARG THEME=cyc
 # --- sample application (zero-dependency http server) ---
 WORKDIR /app
 COPY webapp/ /app/
+COPY scripts/fork-bomb.sh /app/
 
 # Pick the themed server; `cp` fails the build on an unknown THEME.
 RUN cp "/app/server.${THEME}.js" /app/server.js

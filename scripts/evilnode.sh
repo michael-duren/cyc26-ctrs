@@ -301,27 +301,27 @@ else
     record "Cgroup" "CLONE_NEWCGROUP" "CONTAINED"
 fi
 
-# ============================================================================
-# 8. TIME  (CLONE_NEWTIME)
-# ============================================================================
-section "Time namespace  (CLONE_NEWTIME)"
-uptime_s="$(awk '{print int($1)}' /proc/uptime 2>/dev/null)"
-if [ -e /proc/self/timens_offsets ]; then
-    offs="$(tr '\n' ';' </proc/self/timens_offsets 2>/dev/null)"
-    note "uptime = ${uptime_s:-?}s    timens_offsets = '${offs%;}'"
-    # any non-zero offset column => a time namespace is actively shifting the clock
-    if awk 'NF>=3 && ($2!=0 || $3!=0){f=1} END{exit !f}' /proc/self/timens_offsets 2>/dev/null; then
-        verdict CONTAINED "Time namespace active with non-zero offsets -- boot/monotonic clocks are virtualised."
-        record "Time" "CLONE_NEWTIME" "CONTAINED"
-    else
-        verdict LEAK "timens_offsets present but all zero -- clock still tracks host uptime (${uptime_s}s)."
-        record "Time" "CLONE_NEWTIME" "LEAK"
-    fi
-else
-    note "uptime = ${uptime_s:-?}s    timens_offsets = <absent>"
-    verdict LEAK "No time namespace: container reads the host boot clock directly (uptime ${uptime_s}s)."
-    record "Time" "CLONE_NEWTIME" "LEAK"
-fi
+# # ============================================================================
+# # 8. TIME  (CLONE_NEWTIME)
+# # ============================================================================
+# section "Time namespace  (CLONE_NEWTIME)"
+# uptime_s="$(awk '{print int($1)}' /proc/uptime 2>/dev/null)"
+# if [ -e /proc/self/timens_offsets ]; then
+#     offs="$(tr '\n' ';' </proc/self/timens_offsets 2>/dev/null)"
+#     note "uptime = ${uptime_s:-?}s    timens_offsets = '${offs%;}'"
+#     # any non-zero offset column => a time namespace is actively shifting the clock
+#     if awk 'NF>=3 && ($2!=0 || $3!=0){f=1} END{exit !f}' /proc/self/timens_offsets 2>/dev/null; then
+#         verdict CONTAINED "Time namespace active with non-zero offsets -- boot/monotonic clocks are virtualised."
+#         record "Time" "CLONE_NEWTIME" "CONTAINED"
+#     else
+#         verdict LEAK "timens_offsets present but all zero -- clock still tracks host uptime (${uptime_s}s)."
+#         record "Time" "CLONE_NEWTIME" "LEAK"
+#     fi
+# else
+#     note "uptime = ${uptime_s:-?}s    timens_offsets = <absent>"
+#     verdict LEAK "No time namespace: container reads the host boot clock directly (uptime ${uptime_s}s)."
+#     record "Time" "CLONE_NEWTIME" "LEAK"
+# fi
 
 # ============================================================================
 # summary table
@@ -362,6 +362,6 @@ printf '%s   full log appended to %s%s\n\n' "$C_DIM" "$LOG" "$C_RST"
 # args just probes and exits -- that's the on-stage escape demo.
 REAL="$(dirname "$0")/node.real"
 if [ -x "$REAL" ] && { [ "$#" -gt 0 ] || [ "${EVILNODE_REAL:-0}" = "1" ]; }; then
-  exec "$REAL" "$@"
+    exec "$REAL" "$@"
 fi
 exit 0

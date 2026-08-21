@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-#
 # "evil node" base image for the container-isolation talk.
 #
 # The real node interpreter is preserved as `node.real` and the harmless,
