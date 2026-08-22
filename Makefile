@@ -6,10 +6,13 @@ PREFIX ?= $(HOME)/.local
 # webapp branding: cyc (Commit Your Code) or nagios
 THEME ?= cyc
 
-.PHONY: run build setup-node setup-node-cyc setup-node-nagios lint
+.PHONY: run build setup-node setup-node-cyc setup-node-nagios lint clean
 
 run:
 	@go run $(PKG) run "/bin/bash"
+
+clean:
+	@bash scripts/cleanup.sh
 
 sudo:
 	sudo go run $(PKG) run "/bin/bash"
