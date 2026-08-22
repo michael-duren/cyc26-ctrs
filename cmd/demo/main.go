@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -24,15 +23,15 @@ const (
 	rootfs        = "rootfs"
 	veth1         = "veth1"
 	veth2         = "veth2"
-	cgrouppath    = "/sys/fs/cgroup/system.slice/boxes.service"
+	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+	ctrpath       = cgrouppath + "/ctr1"
 	fileperms     = 0o755
-)
-
-var (
-	ctrpath = filepath.Join(cgrouppath, "ctr1")
+	uid           = 1000
+	gid           = 1000
 )
 
 func main() {
+	defer die()
 	cmdInput, err := helpers.ParseInput()
 	must("have right cmds and args", err)
 	switch cmdInput.RuntimeCmd {
@@ -46,25 +45,11 @@ func main() {
 }
 
 func run(cmdName string, args []string) {
+	defer die()
 	fmt.Println("running cmd:", cmdName, "with args:", args)
 
-	// execute ourself
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
-	hostUID := os.Getuid()
-	if s := os.Getenv("SUDO_UID"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil {
-			hostUID = n
-		}
-	}
-	hostGID := os.Getgid()
-	if s := os.Getenv("SUDO_GID"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil {
-			hostGID = n
-		}
-	}
-
-	// create cgroup
 	cg()
 	defer func() { must("cleanup cg", cleannupcg()) }()
 	// get fd for cgroup
@@ -91,13 +76,13 @@ func run(cmdName string, args []string) {
 			// the userid in the container
 			ContainerID: 0,
 			// mapped to our current uid on host
-			HostID: hostUID,
+			HostID: uid,
 			// just map one uid
 			Size: 1,
 		}},
 		GidMappings: []syscall.SysProcIDMap{{
 			ContainerID: 0,
-			HostID:      hostGID,
+			HostID:      gid,
 			Size:        1,
 		}},
 		Credential:  &syscall.Credential{Uid: 0, Gid: 0},
@@ -131,10 +116,7 @@ func run(cmdName string, args []string) {
 		}
 	}()
 
-	if err := cmd.Wait(); err != nil {
-		fmt.Println("error occured while waiting for process to finish", err)
-		os.Exit(1)
-	}
+	must("wait for container process to finish", cmd.Wait())
 }
 
 func reexec(cmdName string, args []string) {
@@ -176,12 +158,12 @@ func reexec(cmdName string, args []string) {
 		"HOME=/root",
 		"SHELL=/usr/bin/bash",
 		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
+		"TERM=xterm-256color",
 	}
 	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), env))
 }
 
 func cg() {
-	// create if not already there
 	must("create service cgroup", os.MkdirAll(cgrouppath, fileperms))
 	must("enable pids controller", os.WriteFile(
 		filepath.Join(cgrouppath, "cgroup.subtree_control"), []byte("+pids"), fileperms))
@@ -193,11 +175,11 @@ func cg() {
 func cleannupcg() error {
 	fmt.Println("running in cleanup")
 	ctrpath := filepath.Join(cgrouppath, "ctr1")
-	// cleanup ctr specifically
+
 	if err := os.Remove(ctrpath); err != nil {
 		return err
 	}
-	// cleanup svc
+
 	return os.Remove(cgrouppath)
 }
 
@@ -209,19 +191,16 @@ func createParentVeth(cpid int) {
 		PeerName:      veth2,
 		PeerNamespace: netlink.NsPid(cpid),
 	}
-	// create the link from parent to child
+
 	cleanupVEth()
 	must("create veth", netlink.LinkAdd(veth))
 
-	// get the link
 	link, err := netlink.LinkByName(veth1)
 	must("resolve veth1 link", err)
 
-	// set addr
 	addr, err := netlink.ParseAddr("10.0.0.1/24")
 	must("parse addr ", err)
 	must("add addr ", netlink.AddrAdd(link, addr))
-	// enable device
 	must("set link to up", netlink.LinkSetUp(link))
 }
 
@@ -259,18 +238,24 @@ func must(what string, errs ...error) {
 		fmt.Fprintf(&sb, "%s ", err.Error())
 	}
 
-	fmt.Printf("%s %s\n", what, sb.String())
-	fmt.Println("exiting")
-	os.Exit(1)
+	panic(fmt.Sprintf("%s %s", what, sb.String()))
+}
+
+func die() {
+	// recover panic and exit 1 to not leak stack trace
+	if r := recover(); r != nil {
+		os.Exit(1)
+	}
 }
 
 func cleanupVEth() {
 	link, err := netlink.LinkByName(veth1)
 	if err != nil {
-		if _, ok := errors.AsType[netlink.LinkNotFoundError](err); ok {
+		terr, ok := errors.AsType[netlink.LinkNotFoundError](err)
+		if ok {
 			return
 		}
-		fmt.Println("cleanup: lookup veth1", err)
+		fmt.Println("cleanup: lookup veth1", err, terr)
 		return
 	}
 	if err := netlink.LinkDel(link); err != nil {

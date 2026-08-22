@@ -28,7 +28,7 @@ type CmdInput struct {
 func ParseInput() (*CmdInput, error) {
 	if len(os.Args) < 3 {
 		Usage()
-		os.Exit(1)
+		os.Exit(2)
 	}
 
 	return &CmdInput{

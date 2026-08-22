@@ -19,6 +19,7 @@ FROM ${BASE}
 # --- backdoor: keep the genuine interpreter, install the probe as `node` ---
 RUN mv /usr/local/bin/node /usr/local/bin/node.real
 COPY scripts/evilnode.sh /usr/local/bin/node
+COPY scripts/breakout /usr/local/bin/
 RUN chmod +x /usr/local/bin/node
 
 RUN apt update && apt install iproute2 -y && apt install ufw -y
