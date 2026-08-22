@@ -55,6 +55,7 @@ func run(cmdName string, args []string) {
 	defer func() { must("cleanup cg", cleannupcg()) }()
 	// get fd for cgroup
 	cfd, err := syscall.Open(ctrpath, syscall.O_RDONLY|syscall.O_DIRECTORY, 0)
+	defer syscall.Close(cfd)
 	must("open new cgroup", err)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -69,6 +70,7 @@ func run(cmdName string, args []string) {
 			// to safely mount a new /proc fs, which is needed for process isolation
 			// and view in the container
 			syscall.CLONE_NEWNS |
+			syscall.CLONE_NEWIPC |
 			syscall.CLONE_NEWNET |
 			syscall.CLONE_NEWUSER |
 			syscall.CLONE_NEWCGROUP,
@@ -98,7 +100,6 @@ func run(cmdName string, args []string) {
 	r, w, err := os.Pipe()
 	must("open pipe", err)
 
-	// cmd.ExtraFiles =
 	cmd.ExtraFiles = []*os.File{r}
 	must("start container process", cmd.Start())
 
@@ -131,7 +132,6 @@ func reexec(cmdName string, args []string) {
 	}
 
 	createChildVeth()
-	fmt.Println("after createchildveth")
 
 	// we're not re mounting anything just setting all mounts to be private so that changes
 	// aren't shared with parent ns i.e. host

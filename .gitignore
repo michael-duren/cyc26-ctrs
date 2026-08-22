@@ -11,6 +11,5 @@ node.real
 
 # probe output
 *.log
-demo
 tmp.*
 breakout
