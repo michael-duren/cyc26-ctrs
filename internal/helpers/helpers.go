@@ -28,7 +28,7 @@ type CmdInput struct {
 func ParseInput() (*CmdInput, error) {
 	if len(os.Args) < 3 {
 		Usage()
-		return nil, fmt.Errorf("unable to read args: %v", os.Args)
+		os.Exit(1)
 	}
 
 	return &CmdInput{

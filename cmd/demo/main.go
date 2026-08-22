@@ -13,22 +13,23 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/michael-duren/boxes/presentation-project/internal/firewall"
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
 	"github.com/vishvananda/netlink"
 )
 
-// the two halves of docker's -p 3000:3000
 const (
 	containeraddr = "10.0.0.2"
-	containerPort = "3000"
-	hostPort      = "3000"
+	port          = "3000"
 	rootfs        = "rootfs"
 	veth1         = "veth1"
 	veth2         = "veth2"
 	cgrouppath    = "/sys/fs/cgroup/system.slice/boxes.service"
 	fileperms     = 0o755
+)
+
+var (
+	ctrpath = filepath.Join(cgrouppath, "ctr1")
 )
 
 func main() {
@@ -62,6 +63,14 @@ func run(cmdName string, args []string) {
 			hostGID = n
 		}
 	}
+
+	// create cgroup
+	cg()
+	defer func() { must("cleanup cg", cleannupcg()) }()
+	// get fd for cgroup
+	cfd, err := syscall.Open(ctrpath, syscall.O_RDONLY|syscall.O_DIRECTORY, 0)
+	must("open new cgroup", err)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// clone flags are the arguments we can pass to the `clone`
 		// syscall to configure our new process namespaces
@@ -91,7 +100,9 @@ func run(cmdName string, args []string) {
 			HostID:      hostGID,
 			Size:        1,
 		}},
-		Credential: &syscall.Credential{Uid: 0, Gid: 0},
+		Credential:  &syscall.Credential{Uid: 0, Gid: 0},
+		UseCgroupFD: true,
+		CgroupFD:    cfd,
 	}
 
 	cmd.Stdin = os.Stdin
@@ -109,23 +120,12 @@ func run(cmdName string, args []string) {
 	defer cleanupVEth()
 	createParentVeth(pid)
 
-	cg(pid)
-	defer func() { must("cleanup cg", cleannupcg()) }()
-
 	// close writer sends eof to cprocess
 	must("close writer to send cp eof signal", w.Close())
 
-	// like docker's DOCKER chain: only the published port gets through
-	must("apply firewall rules", firewall.Block(containeraddr, containerPort))
-	defer func() {
-		if err := firewall.Cleanup(); err != nil {
-			fmt.Println("firewall cleanup failed:", err)
-		}
-	}()
-
 	go func() {
 		// docker-style -p: wildcard bind covers localhost, 10.0.0.1, and LAN
-		err := proxy.Proxy(proxy.ToAddr("0.0.0.0", hostPort), proxy.ToAddr(containeraddr, containerPort))
+		err := proxy.Proxy(proxy.ToAddr("0.0.0.0", port), proxy.ToAddr(containeraddr, port))
 		if err != nil {
 			fmt.Println("err proxying", err)
 		}
@@ -135,7 +135,6 @@ func run(cmdName string, args []string) {
 		fmt.Println("error occured while waiting for process to finish", err)
 		os.Exit(1)
 	}
-	os.Exit(0)
 }
 
 func reexec(cmdName string, args []string) {
@@ -165,28 +164,29 @@ func reexec(cmdName string, args []string) {
 
 	// mount a new proc
 	must("mount /proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
+	// mount a new cgroup
+	must("make cgroup dir", os.MkdirAll("/sys/fs/cgroup", fileperms))
+	must("mount /sys/fs/cgroup", syscall.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""))
 
 	path, err := exec.LookPath(cmdName)
 	must("resolve command path", err)
 
-	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), os.Environ()))
+	env := []string{
+		"USER=root",
+		"HOME=/root",
+		"SHELL=/usr/bin/bash",
+		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
+	}
+	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), env))
 }
 
-func cg(pid int) {
+func cg() {
 	// create if not already there
 	must("create service cgroup", os.MkdirAll(cgrouppath, fileperms))
 	must("enable pids controller", os.WriteFile(
 		filepath.Join(cgrouppath, "cgroup.subtree_control"), []byte("+pids"), fileperms))
 
-	ctrpath := filepath.Join(cgrouppath, "ctr1")
 	must("create ctr cgroup", os.MkdirAll(ctrpath, fileperms))
-	must("write current pid to new cgroup",
-		os.WriteFile(
-			filepath.Join(ctrpath, "cgroup.procs"),
-			fmt.Appendf(nil, "%d", pid),
-			fileperms,
-		),
-	)
 	must("write pids.max", os.WriteFile(filepath.Join(ctrpath, "pids.max"), []byte("50"), fileperms))
 }
 
