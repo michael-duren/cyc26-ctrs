@@ -13,6 +13,18 @@ func PivotRoot(newroot string, fileperms os.FileMode) error {
 		return err
 	}
 
+	// Mount the new /proc NOW, while the old root's fully-visible /proc is
+	// still attached. In a userns the kernel only allows a fresh procfs if it
+	// can validate it against an existing fully-visible proc; once we detach
+	// the old root below, that reference is gone and the mount EPERMs.
+	proc := filepath.Join(newroot, "proc")
+	if err := os.MkdirAll(proc, fileperms); err != nil {
+		return err
+	}
+	if err := syscall.Mount("proc", proc, "proc", 0, ""); err != nil {
+		return err
+	}
+
 	// put_old must sit inside newroot
 	putold := filepath.Join(newroot, ".put_old")
 	if err := os.MkdirAll(putold, fileperms); err != nil {

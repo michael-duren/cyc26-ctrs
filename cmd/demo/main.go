@@ -142,12 +142,15 @@ func reexec(cmdName string, args []string) {
 	_, err = rand.Read(hn)
 	must("generate hostname", err)
 	must("change hostname", syscall.Sethostname([]byte(hex.EncodeToString(hn))))
+
+	// NOTE: calls if using chroot
 	// must("change root", syscall.Chroot(rootfs))
 	// must("change dir to root level", syscall.Chdir("/"))
+	// mount a new proc
+	// must("mount /proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
+
 	must("pivot root", root.PivotRoot(rootfs, fileperms))
 
-	// mount a new proc
-	must("mount /proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
 	// mount a new cgroup
 	must("make cgroup dir", os.MkdirAll("/sys/fs/cgroup", fileperms))
 	must("mount /sys/fs/cgroup", syscall.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""))
