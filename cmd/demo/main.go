@@ -14,13 +14,14 @@ import (
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
+	"github.com/michael-duren/boxes/presentation-project/internal/root"
 	"github.com/vishvananda/netlink"
 )
 
 const (
 	containeraddr = "10.0.0.2"
 	port          = "3000"
-	rootfs        = "rootfs"
+	rootfs        = "_rootfs"
 	veth1         = "veth1"
 	veth2         = "veth2"
 	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
@@ -141,8 +142,9 @@ func reexec(cmdName string, args []string) {
 	_, err = rand.Read(hn)
 	must("generate hostname", err)
 	must("change hostname", syscall.Sethostname([]byte(hex.EncodeToString(hn))))
-	must("change root", syscall.Chroot(rootfs))
-	must("change dir to root level", syscall.Chdir("/"))
+	// must("change root", syscall.Chroot(rootfs))
+	// must("change dir to root level", syscall.Chdir("/"))
+	must("pivot root", root.PivotRoot(rootfs, fileperms))
 
 	// mount a new proc
 	must("mount /proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
@@ -244,6 +246,7 @@ func must(what string, errs ...error) {
 func die() {
 	// recover panic and exit 1 to not leak stack trace
 	if r := recover(); r != nil {
+		fmt.Println(r)
 		os.Exit(1)
 	}
 }

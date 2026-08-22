@@ -23,15 +23,15 @@ THEME=${1:-cyc}
 case "${THEME}" in
 cyc | nagios) ;;
 *)
-  echo -e "${C_RED}> unknown theme '${THEME}' -- expected 'cyc' or 'nagios'${C_RST}" >&2
-  echo -e "  usage: bash scripts/setup.sh [cyc|nagios]" >&2
-  exit 2
-  ;;
+    echo -e "${C_RED}> unknown theme '${THEME}' -- expected 'cyc' or 'nagios'${C_RST}" >&2
+    echo -e "  usage: bash scripts/setup.sh [cyc|nagios]" >&2
+    exit 2
+    ;;
 esac
 
 BASE_IMAGE=${BASE_IMAGE:-cyc26node}
 APP_IMAGE=${APP_IMAGE:-cyc26node-app:${THEME}}
-ROOTFS=${ROOTFS:-rootfs}
+ROOTFS=${ROOTFS:-_rootfs}
 BASE=${BASE:-node:latest}
 
 # Build context is the project root (Dockerfile needs scripts/, Dockerfile.app

@@ -1,5 +1,6 @@
 # exported container filesystem (regenerate with `make setup-node`)
 /rootfs/
+/_rootfs/
 
 # the real interpreter, if it ever gets pulled out of the image
 node.real
@@ -10,3 +11,5 @@ node.real
 
 # probe output
 *.log
+demo
+tmp.*
