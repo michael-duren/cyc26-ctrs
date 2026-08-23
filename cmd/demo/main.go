@@ -10,16 +10,15 @@ import (
 	"syscall"
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
+	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
 	"github.com/michael-duren/boxes/presentation-project/internal/veth"
 )
 
 const (
-	// 	containeraddr = "10.0.0.2"
-	// 	port          = "3000"
-	rootfs = "_rootfs"
+	containeraddr = "10.0.0.2"
+	port          = "3000"
+	rootfs        = "_rootfs"
 
-	// veth1         = "veth1"
-	// veth2         = "veth2"
 	// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
 	// ctrpath       = cgrouppath + "/ctr1"
 	// fileperms     = 0o755
@@ -94,6 +93,16 @@ func run(cmdName string, args []string) {
 	// close pipe to signal to child process
 	// we're ready for it
 	must("close writer to send cp eof", w.Close())
+
+	// setup proxy
+
+	go func() {
+		// docker-style -p: wildcard bind covers localhost, 10.0.0.1, and LAN
+		err := proxy.Proxy(proxy.ToAddr("0.0.0.0", port), proxy.ToAddr(containeraddr, port))
+		if err != nil {
+			fmt.Println("err proxying", err)
+		}
+	}()
 
 	cmd.Wait()
 }
