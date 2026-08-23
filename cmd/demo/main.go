@@ -31,6 +31,16 @@ const (
 	gid           = 1000
 )
 
+var (
+	env = []string{
+		"USER=root",
+		"HOME=/root",
+		"SHELL=/usr/bin/bash",
+		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
+		"TERM=xterm-256color",
+	}
+)
+
 func main() {
 	defer die()
 	cmdInput, err := helpers.ParseInput()
@@ -158,13 +168,6 @@ func reexec(cmdName string, args []string) {
 	path, err := exec.LookPath(cmdName)
 	must("resolve command path", err)
 
-	env := []string{
-		"USER=root",
-		"HOME=/root",
-		"SHELL=/usr/bin/bash",
-		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
-		"TERM=xterm-256color",
-	}
 	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), env))
 }
 
