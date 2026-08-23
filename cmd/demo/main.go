@@ -55,7 +55,7 @@ func run(cmdName string, args []string) {
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC,
 	}
 
 	// hook up process stdin to ours
@@ -72,8 +72,12 @@ func run(cmdName string, args []string) {
 func reexec(cmdName string, args []string) {
 	fmt.Println("reexecing cmd:", cmdName, "with args:", args)
 
+	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))
+
 	must("change root", syscall.Chroot(rootfs))
 	must("change to new root", syscall.Chdir("/"))
+
+	must("mount proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
 
 	must("change hostname", syscall.Sethostname([]byte("container")))
 	must("exev the new process", syscall.Exec(cmdName, args, env))
