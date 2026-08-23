@@ -15,13 +15,13 @@ const (
 	// 	port          = "3000"
 	rootfs = "_rootfs"
 
-// veth1         = "veth1"
-// veth2         = "veth2"
-// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
-// ctrpath       = cgrouppath + "/ctr1"
-// fileperms     = 0o755
-// uid           = 1000
-// gid           = 1000
+	// veth1         = "veth1"
+	// veth2         = "veth2"
+	// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+	// ctrpath       = cgrouppath + "/ctr1"
+	// fileperms     = 0o755
+	uid = 1000
+	gid = 1000
 )
 
 var (
@@ -55,7 +55,20 @@ func run(cmdName string, args []string) {
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER,
+		// map root uid, gid to a non root user on the 'outside' or host
+		UidMappings: []syscall.SysProcIDMap{{
+			ContainerID: 0,
+			HostID:      uid,
+			Size:        1,
+		}},
+		GidMappings: []syscall.SysProcIDMap{{
+			ContainerID: 0,
+			HostID:      gid,
+			Size:        1,
+		}},
+		// sets the user the child process starts as, in this case root
+		Credential: &syscall.Credential{Uid: 0, Gid: 0},
 	}
 
 	// hook up process stdin to ours
