@@ -1,13 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
+	"github.com/michael-duren/boxes/presentation-project/internal/veth"
 )
 
 const (
@@ -55,7 +58,7 @@ func run(cmdName string, args []string) {
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER | syscall.CLONE_NEWNET,
 		// map root uid, gid to a non root user on the 'outside' or host
 		UidMappings: []syscall.SysProcIDMap{{
 			ContainerID: 0,
@@ -76,14 +79,36 @@ func run(cmdName string, args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
+	r, w, err := os.Pipe()
+	must("open pipe", err)
+	// pass reader to child
+	cmd.ExtraFiles = []*os.File{r}
+
+	if err := cmd.Start(); err != nil {
 		fmt.Println("error: ", err)
 		os.Exit(1)
 	}
+	defer veth.CleanupVEth()
+	veth.CreateParentVeth(cmd.Process.Pid)
+
+	// close pipe to signal to child process
+	// we're ready for it
+	must("close writer to send cp eof", w.Close())
+
+	cmd.Wait()
 }
 
 func reexec(cmdName string, args []string) {
 	fmt.Println("reexecing cmd:", cmdName, "with args:", args)
+
+	r := os.NewFile(3, "sync")
+	buf := make([]byte, 1)
+	_, err := r.Read(buf)
+	if !errors.Is(err, io.EOF) {
+		must("receive eof from parent", err)
+	}
+
+	must("create child veth", veth.CreateChildVeth())
 
 	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))
 
