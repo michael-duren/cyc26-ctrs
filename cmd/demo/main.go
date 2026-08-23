@@ -3,15 +3,17 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 )
 
-// const (
+const (
 // 	containeraddr = "10.0.0.2"
 // 	port          = "3000"
-// 	rootfs        = "_rootfs"
+	rootfs        = "_rootfs"
 // 	veth1         = "veth1"
 // 	veth2         = "veth2"
 // 	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
@@ -19,7 +21,7 @@ import (
 // 	fileperms     = 0o755
 // 	uid           = 1000
 // 	gid           = 1000
-// )
+)
 
 func main() {
 	defer die()
@@ -38,6 +40,20 @@ func main() {
 func run(cmdName string, args []string) {
 	defer die()
 	fmt.Println("running cmd:", cmdName, "with args:", args)
+
+	must("change root", syscall.Chroot(rootfs))
+	must("change to new root", syscall.Chdir("/"))
+	cmd := exec.Command(cmdName, args...)
+
+	// hoook up process stdin to ours
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		fmt.Println("error: ", err)
+		os.Exit(1)
+	}
 }
 
 func reexec(cmdName string, args []string) {
