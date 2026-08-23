@@ -11,16 +11,27 @@ import (
 )
 
 const (
-// 	containeraddr = "10.0.0.2"
-// 	port          = "3000"
-	rootfs        = "_rootfs"
-// 	veth1         = "veth1"
-// 	veth2         = "veth2"
-// 	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
-// 	ctrpath       = cgrouppath + "/ctr1"
-// 	fileperms     = 0o755
-// 	uid           = 1000
-// 	gid           = 1000
+	// 	containeraddr = "10.0.0.2"
+	// 	port          = "3000"
+	rootfs = "_rootfs"
+
+// veth1         = "veth1"
+// veth2         = "veth2"
+// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+// ctrpath       = cgrouppath + "/ctr1"
+// fileperms     = 0o755
+// uid           = 1000
+// gid           = 1000
+)
+
+var (
+	env = []string{
+		"USER=root",
+		"HOME=/root",
+		"SHELL=/usr/bin/bash",
+		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
+		"TERM=xterm-256color",
+	}
 )
 
 func main() {
@@ -41,11 +52,13 @@ func run(cmdName string, args []string) {
 	defer die()
 	fmt.Println("running cmd:", cmdName, "with args:", args)
 
-	must("change root", syscall.Chroot(rootfs))
-	must("change to new root", syscall.Chdir("/"))
-	cmd := exec.Command(cmdName, args...)
+	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
-	// hoook up process stdin to ours
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags: syscall.CLONE_NEWUTS,
+	}
+
+	// hook up process stdin to ours
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -58,6 +71,12 @@ func run(cmdName string, args []string) {
 
 func reexec(cmdName string, args []string) {
 	fmt.Println("reexecing cmd:", cmdName, "with args:", args)
+
+	must("change root", syscall.Chroot(rootfs))
+	must("change to new root", syscall.Chdir("/"))
+
+	must("change hostname", syscall.Sethostname([]byte("container")))
+	must("exev the new process", syscall.Exec(cmdName, args, env))
 }
 
 func must(what string, errs ...error) {
