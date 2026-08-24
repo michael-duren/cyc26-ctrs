@@ -45,10 +45,11 @@ for cg in "$CGROUP_CTR" "$CGROUP_SVC"; do
     fi
 done
 
-# --- defensive: unmount anything left under the rootfs in the HOST ns.
-#     Normally empty (pivot_root mounts live in the container's mount ns and
-#     die with it), but a half-run in another mode could leave these. ---
-for m in "${ROOTFS}/proc" "${ROOTFS}/sys/fs/cgroup" "${ROOTFS}"; do
+# --- unmount anything left under the rootfs in the HOST ns. Stage 00 has no
+#     mount namespace, so the runtime's proc/sysfs/cgroup2/dev mounts DO
+#     survive it and land here every run. Deepest first: /sys/fs/cgroup is
+#     stacked on /sys, so /sys will not release until it goes. ---
+for m in "${ROOTFS}/sys/fs/cgroup" "${ROOTFS}/sys" "${ROOTFS}/dev" "${ROOTFS}/proc" "${ROOTFS}"; do
     if mountpoint -q "$m" 2>/dev/null; then
         $SUDO umount -l "$m" && done_msg "unmounted $m"
     fi
