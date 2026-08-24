@@ -226,10 +226,13 @@ if [ -n "$capeff" ]; then
     # bit 21 = CAP_SYS_ADMIN
     if [ $((0x$capeff >> 21 & 1)) -eq 1 ] 2>/dev/null; then has_sysadmin=1; fi
 fi
+# hostname readable without procfs too (uname syscall) -- /proc may be unmounted
+hn="${hn:-$(hostname 2>/dev/null || uname -n 2>/dev/null)}"
 note "hostname = '${hn:-?}'    CapEff = ${capeff:-?}    CAP_SYS_ADMIN = $has_sysadmin"
-# a container with its own UTS ns usually gets a random 12-hex-char hostname
-if printf '%s' "$hn" | grep -qE '^[0-9a-f]{12}$'; then
-    verdict CONTAINED "Container-style hostname '$hn' -- own UTS namespace; hostname changes stay local."
+# runtime sets the container hostname to exactly "container" inside its own UTS
+# ns; if we see that, hostname changes stayed local == contained.
+if [ "$hn" = "container" ]; then
+    verdict CONTAINED "Hostname is 'container' -- own UTS namespace; hostname changes stay local."
     record "UTS" "CLONE_NEWUTS" "CONTAINED"
 elif [ "$has_sysadmin" -eq 1 ]; then
     verdict ESCAPED "Hostname '$hn' + CAP_SYS_ADMIN and no private UTS ns -- sethostname() would rename the HOST."
