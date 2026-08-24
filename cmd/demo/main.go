@@ -12,6 +12,7 @@ import (
 	"github.com/michael-duren/boxes/presentation-project/internal/cgroup"
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
+	"github.com/michael-duren/boxes/presentation-project/internal/root"
 	"github.com/michael-duren/boxes/presentation-project/internal/veth"
 )
 
@@ -130,10 +131,12 @@ func reexec(cmdName string, args []string) {
 
 	must("make mounts private", syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, ""))
 
-	must("change root", syscall.Chroot(rootfs))
-	must("change to new root", syscall.Chdir("/"))
-
-	must("mount proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
+	must("pivot root", root.PivotRoot(rootfs, fileperms))
+	// NOTE: this is the old chroot strat, pivot root includes the proc mount
+	// must("change root", syscall.Chroot(rootfs))
+	// must("change to new root", syscall.Chdir("/"))
+	//
+	// must("mount proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
 
 	must("make cgroup dir", os.MkdirAll("/sys/fs/cgroup", fileperms))
 	must("mount /sys/fs/cgroup", syscall.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""))
