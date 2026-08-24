@@ -19,7 +19,6 @@ ARG THEME=cyc
 # --- sample application (zero-dependency http server) ---
 WORKDIR /app
 COPY webapp/ /app/
-COPY scripts/fork-bomb.sh /app/
 
 # Pick the themed server; `cp` fails the build on an unknown THEME.
 RUN cp "/app/server.${THEME}.js" /app/server.js
