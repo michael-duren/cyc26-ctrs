@@ -142,7 +142,10 @@ func reexec(cmdName string, args []string) {
 	must("mount /sys/fs/cgroup", syscall.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""))
 
 	must("change hostname", syscall.Sethostname([]byte("container")))
-	must("exev the new process", syscall.Exec(cmdName, args, env))
+	path, err := exec.LookPath(cmdName)
+	must("resolve command path", err)
+
+	must("execve the new process", syscall.Exec(path, append([]string{cmdName}, args...), env))
 }
 
 func must(what string, errs ...error) {
