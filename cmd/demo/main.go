@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/michael-duren/boxes/presentation-project/internal/cgroup"
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 	"github.com/michael-duren/boxes/presentation-project/internal/proxy"
 	"github.com/michael-duren/boxes/presentation-project/internal/veth"
@@ -19,11 +20,11 @@ const (
 	port          = "3000"
 	rootfs        = "_rootfs"
 
-	// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
-	// ctrpath       = cgrouppath + "/ctr1"
-	// fileperms     = 0o755
-	uid = 1000
-	gid = 1000
+	cgrouppath = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+	ctrpath    = cgrouppath + "/ctr1"
+	fileperms  = 0o755
+	uid        = 1000
+	gid        = 1000
 )
 
 var (
@@ -56,8 +57,14 @@ func run(cmdName string, args []string) {
 
 	cmd := exec.Command("/proc/self/exe", append([]string{"reexec", cmdName}, args...)...)
 
+	cgroup.Cg()
+	defer func() { must("cleanup cg", cgroup.CleanupCg()) }()
+
+	cfd, err := syscall.Open(ctrpath, syscall.O_RDONLY|syscall.O_DIRECTORY, 0)
+	defer syscall.Close(cfd)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER | syscall.CLONE_NEWNET,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWUSER | syscall.CLONE_NEWNET | syscall.CLONE_NEWCGROUP,
 		// map root uid, gid to a non root user on the 'outside' or host
 		UidMappings: []syscall.SysProcIDMap{{
 			ContainerID: 0,
@@ -70,7 +77,9 @@ func run(cmdName string, args []string) {
 			Size:        1,
 		}},
 		// sets the user the child process starts as, in this case root
-		Credential: &syscall.Credential{Uid: 0, Gid: 0},
+		Credential:  &syscall.Credential{Uid: 0, Gid: 0},
+		UseCgroupFD: true,
+		CgroupFD:    cfd,
 	}
 
 	// hook up process stdin to ours
@@ -125,6 +134,9 @@ func reexec(cmdName string, args []string) {
 	must("change to new root", syscall.Chdir("/"))
 
 	must("mount proc", syscall.Mount("proc", "/proc", "proc", 0, ""))
+
+	must("make cgroup dir", os.MkdirAll("/sys/fs/cgroup", fileperms))
+	must("mount /sys/fs/cgroup", syscall.Mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, ""))
 
 	must("change hostname", syscall.Sethostname([]byte("container")))
 	must("exev the new process", syscall.Exec(cmdName, args, env))
