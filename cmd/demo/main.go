@@ -8,28 +8,28 @@ import (
 	"github.com/michael-duren/boxes/presentation-project/internal/helpers"
 )
 
-// const (
-// 	containeraddr = "10.0.0.2"
-// 	port          = "3000"
-// 	rootfs        = "_rootfs"
-// 	veth1         = "veth1"
-// 	veth2         = "veth2"
-// 	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
-// 	ctrpath       = cgrouppath + "/ctr1"
-// 	fileperms     = 0o755
-// 	uid           = 1000
-// 	gid           = 1000
-// )
+const (
+	containeraddr = "10.0.0.2"
+	port          = "3000"
+	rootfs        = "_rootfs"
+	veth1         = "veth1"
+	veth2         = "veth2"
+	cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+	ctrpath       = cgrouppath + "/ctr1"
+	fileperms     = 0o755
+	uid           = 1000
+	gid           = 1000
+)
 
-// var (
-// 	env = []string{
-// 		"USER=root",
-// 		"HOME=/root",
-// 		"SHELL=/usr/bin/bash",
-// 		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
-// 		"TERM=xterm-256color",
-// 	}
-// )
+var (
+	env = []string{
+		"USER=root",
+		"HOME=/root",
+		"SHELL=/usr/bin/bash",
+		"PATH=/bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/bin",
+		"TERM=xterm-256color",
+	}
+)
 
 func main() {
 	defer die()
