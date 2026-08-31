@@ -67,4 +67,9 @@ else
     skip_msg "no probe log"
 fi
 
+if [[ -d "_rootfs" ]]; then
+    echo "removing rootfs"
+    rm -rf "_rootfs"
+fi
+
 echo "clean"
