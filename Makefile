@@ -34,9 +34,12 @@ setup-node: buildc
 setup-node-cyc: buildc
 	@bash scripts/setup.sh cyc
 
-setup-node-nagios: buildc
-	@bash scripts/setup.sh nagios
+# setup-node-nagios: buildc
+# 	@bash scripts/setup.sh nagios
 
 buildc:
 	@echo "building breakout"
 	@cd scripts && gcc -static -o breakout breakout.c && echo "successfully built breakout"
+
+switch:
+	./scripts/switch.sh
