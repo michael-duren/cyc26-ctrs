@@ -14,17 +14,17 @@ import (
 )
 
 const (
-	// 	containeraddr = "10.0.0.2"
-	// 	port          = "3000"
-	rootfs = "_rootfs"
+	containeraddr = "10.0.0.2"
+	port          = "3000"
+	rootfs        = "_rootfs"
 
-	// veth1         = "veth1"
-	// veth2         = "veth2"
-	// cgrouppath    = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
-	// ctrpath       = cgrouppath + "/ctr1"
-	// fileperms     = 0o755
-	uid = 1000
-	gid = 1000
+	veth1      = "veth1"
+	veth2      = "veth2"
+	cgrouppath = "/sys/fs/cgroup/user.slice/user-1000.slice/boxes.service"
+	ctrpath    = cgrouppath + "/ctr1"
+	fileperms  = 0o755
+	uid        = 1000
+	gid        = 1000
 )
 
 var (
